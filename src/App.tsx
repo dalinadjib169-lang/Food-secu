@@ -88,16 +88,23 @@ export default function App() {
     };
   }, []);
 
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const login = async () => {
+    setIsLoggingIn(true);
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') {
         console.log("User closed the login popup.");
+      } else if (err.code === 'auth/popup-blocked') {
+        alert("يرجى السماح بالنوافذ المنبثقة (Popups) في متصفحك لإتمام عملية الدخول.");
       } else {
         alert("فشل تسجيل الدخول: " + err.message);
         console.error("Login failed:", err);
       }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -210,9 +217,19 @@ export default function App() {
               <button 
                 id="farmer-login-btn"
                 onClick={login}
-                className="bg-brand-accent text-brand-bg px-6 h-12 rounded-2xl font-black hover:bg-brand-accent/90 transition-all flex items-center gap-2 shadow-lg shadow-brand-accent/30 active:scale-95"
+                disabled={isLoggingIn}
+                className="bg-brand-accent text-brand-bg px-6 h-12 rounded-2xl font-black hover:bg-brand-accent/90 transition-all flex items-center gap-2 shadow-lg shadow-brand-accent/30 active:scale-95 disabled:opacity-50 disabled:cursor-wait"
               >
-                <User size={20} /> دخول الفلاحين
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    جاري الدخول...
+                  </>
+                ) : (
+                  <>
+                    <User size={20} /> دخول الفلاحين
+                  </>
+                )}
               </button>
             )}
           </div>
