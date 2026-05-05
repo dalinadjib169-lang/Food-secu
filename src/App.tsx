@@ -91,17 +91,25 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const login = async () => {
+    console.log("Starting login process...");
     setIsLoggingIn(true);
     try {
+      console.log("Opening Google identity popup...");
       await signInWithPopup(auth, googleProvider);
+      console.log("Logged in successfully!");
     } catch (err: any) {
+      console.error("Detailed Login Error Object:", err);
+      console.error("Error Code:", err.code);
+      console.error("Error Message:", err.message);
+      
       if (err.code === 'auth/popup-closed-by-user') {
-        console.log("User closed the login popup.");
+        // Silent fail, user just closed it
       } else if (err.code === 'auth/popup-blocked') {
-        alert("يرجى السماح بالنوافذ المنبثقة (Popups) في متصفحك لإتمام عملية الدخول.");
+        alert("⚠️ المتصفح منع فتح نافذة الدخول. يرجى السماح بالنوافذ المنبثقة (Popups) ثم المحاولة مرة أخرى.");
+      } else if (err.code === 'auth/unauthorized-domain') {
+        alert("❌ هذا النطاق غير مصرح به في Firebase. يرجى إضافة food-secu.vercel.app إلى Authorized domains في إعدادات Firebase.");
       } else {
-        alert("فشل تسجيل الدخول: " + err.message);
-        console.error("Login failed:", err);
+        alert("حدث خطأ أثناء الدخول: " + (err.message || "خطأ غير معروف"));
       }
     } finally {
       setIsLoggingIn(false);
