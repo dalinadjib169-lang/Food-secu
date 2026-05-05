@@ -132,13 +132,25 @@ export default function App() {
     }
   };
 
+  const handleAddButtonClick = () => {
+    if (!user) {
+      if (confirm("يجب تسجيل الدخول كفلاح لإضافة منتجات. هل تريد تسجيل الدخول الآن؟")) {
+        login();
+      }
+    } else {
+      setIsModalOpen(true);
+    }
+  };
+
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     p.wilaya?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
+
     <div className="min-h-screen bg-brand-bg text-[#e0e7e1] font-sans selection:bg-emerald-500/20" dir="rtl">
+
       {/* Top Banner / Ticker */}
       <div className="bg-brand-header border-b border-white/5 text-xs py-2 px-4 shadow-sm overflow-hidden whitespace-nowrap">
         <motion.div 
@@ -196,13 +208,15 @@ export default function App() {
               </div>
             ) : (
               <button 
+                id="farmer-login-btn"
                 onClick={login}
-                className="bg-brand-accent text-brand-bg px-6 h-12 rounded-2xl font-bold hover:bg-brand-accent/90 transition-all flex items-center gap-2 shadow-lg shadow-brand-accent/10"
+                className="bg-brand-accent text-brand-bg px-6 h-12 rounded-2xl font-black hover:bg-brand-accent/90 transition-all flex items-center gap-2 shadow-lg shadow-brand-accent/30 active:scale-95"
               >
                 <User size={20} /> دخول الفلاحين
               </button>
             )}
           </div>
+
         </header>
 
         {/* Content Navigation */}
@@ -229,8 +243,8 @@ export default function App() {
           ))}
           
           <button 
-            onClick={() => setIsModalOpen(true)}
-            className="mr-auto bg-brand-accent text-brand-bg px-6 py-3 rounded-2xl font-bold hover:bg-brand-accent/90 transition-all shadow-lg shadow-brand-accent/10 flex items-center gap-2 text-sm"
+            onClick={handleAddButtonClick}
+            className="mr-auto bg-brand-accent text-brand-bg px-6 py-3 rounded-2xl font-black hover:bg-brand-accent/90 transition-all shadow-lg shadow-brand-accent/20 flex items-center gap-2 text-sm active:scale-95 border-b-4 border-brand-accent/20"
           >
             <PlusCircle size={18} /> إضافة منتج
           </button>
@@ -438,7 +452,12 @@ export default function App() {
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-brand-sidebar/90 backdrop-blur-xl text-white h-16 rounded-full flex items-center justify-around px-6 shadow-2xl border border-white/10 sm:hidden z-40">
         <button onClick={() => setView('marketplace')} className={cn("p-2 transition-all", view === 'marketplace' && "text-brand-accent scale-125")}><LayoutGrid size={22} /></button>
         <button onClick={() => setView('map')} className={cn("p-2 transition-all", view === 'map' && "text-brand-accent scale-125")}><MapIcon size={22} /></button>
-        <button onClick={() => setIsModalOpen(true)} className="bg-brand-accent text-brand-bg p-4 rounded-full -mt-12 border-4 border-brand-bg shadow-xl shadow-brand-accent/20"><PlusCircle size={28} /></button>
+        <button 
+          onClick={handleAddButtonClick} 
+          className="bg-brand-accent text-brand-bg p-4 rounded-full -mt-12 border-4 border-brand-bg shadow-xl shadow-brand-accent/30 active:scale-90"
+        >
+          <PlusCircle size={28} />
+        </button>
         <button onClick={() => setView('tracking')} className={cn("p-2 transition-all", view === 'tracking' && "text-brand-accent scale-125")}><BarChart3 size={22} /></button>
         <button onClick={() => setView('reports')} className={cn("p-2 transition-all", view === 'reports' && "text-brand-accent scale-125")}><AlertTriangle size={22} /></button>
       </div>

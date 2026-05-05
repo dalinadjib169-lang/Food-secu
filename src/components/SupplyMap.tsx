@@ -1,9 +1,26 @@
-import React, { useState } from "react";
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from "@vis.gl/react-google-maps";
+import React from "react";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { Product } from "../lib/types";
-import { MapPin, ShoppingBag } from "lucide-react";
+import { Leaf } from "lucide-react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
-const API_KEY = process.env.GOOGLE_MAPS_PLATFORM_KEY || "";
+// Fix for default marker icons in Leaflet
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerIconRetina from "leaflet/dist/images/marker-icon-2x.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+const DefaultIcon = L.icon({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIconRetina,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 // Mock data for strategic food hubs in Algeria
 const MOCK_HUBS = [
@@ -20,97 +37,79 @@ interface SupplyMapProps {
 }
 
 export function SupplyMap({ products }: SupplyMapProps) {
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
-
-  if (!API_KEY) {
-    return (
-      <div className="h-[500px] bg-white/[0.02] flex items-center justify-center rounded-[32px] border-2 border-dashed border-white/10">
-        <div className="text-center max-w-md px-6">
-          <MapPin className="w-12 h-12 text-white/10 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-white mb-2">خرائط Google غير مفعلة</h3>
-          <p className="text-white/40 text-sm">لعرض الخريطة التفاعلية للأمن الغذائي، يرجى إضافة GOOGLE_MAPS_PLATFORM_KEY في الإعدادات.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full h-[600px] rounded-[32px] overflow-hidden shadow-2xl border border-white/10 bg-brand-sidebar">
-      <APIProvider apiKey={API_KEY}>
-        <Map
-          defaultCenter={{ lat: 32.0339, lng: 1.6596 }} // Central Algeria
-          defaultZoom={5}
-          mapId="FOODSECURE_MAP"
-          gestureHandling={'greedy'}
-          disableDefaultUI={false}
-          className="w-full h-full grayscale-[0.5] invert-[0.05]"
-        >
-          {/* User Added Products */}
-          {products.map((product) => (
-            <AdvancedMarker
-              key={product.id}
-              position={product.location}
-              onClick={() => setSelectedProduct(product)}
-            >
-              <Pin 
-                background="#22c55e" 
-                borderColor="#0a0f0b" 
-                glyphColor="#0a0f0b"
-              />
-            </AdvancedMarker>
-          ))}
-
-          {/* Mock Strategic Hubs */}
-          {MOCK_HUBS.map((hub) => (
-            <AdvancedMarker
-              key={hub.id}
-              position={hub.location}
-              onClick={() => setSelectedProduct(hub)}
-            >
-              <div className="relative group">
-                <div className="absolute -inset-2 bg-brand-accent/20 rounded-full animate-ping"></div>
-                <Pin 
-                  background="#eab308" 
-                  borderColor="#0a0f0b" 
-                  glyphColor="#0a0f0b"
-                  scale={0.8}
-                />
-              </div>
-            </AdvancedMarker>
-          ))}
-
-          {selectedProduct && (
-            <InfoWindow
-              position={selectedProduct.location || selectedProduct.position}
-              onCloseClick={() => setSelectedProduct(null)}
-            >
-              <div className="p-3 max-w-[240px] bg-brand-sidebar text-white shadow-2xl rounded-2xl border border-white/10" dir="rtl">
-                {selectedProduct.imageUrl ? (
+    <div className="w-full h-[600px] rounded-[32px] overflow-hidden shadow-2xl border border-white/10 bg-[#0a0f0b] relative z-0">
+      <MapContainer 
+        center={[28.0339, 1.6596]} 
+        zoom={5} 
+        style={{ height: "100%", width: "100%", background: "#0a0f0b" }}
+        scrollWheelZoom={false}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        />
+        
+        {/* User Added Products */}
+        {products.map((product) => (
+          <Marker 
+            key={product.id} 
+            position={[product.location?.lat || 36.75, product.location?.lng || 3.05]}
+          >
+            <Popup>
+              <div className="p-2 max-w-[200px] text-right font-sans" dir="rtl">
+                {product.imageUrl && (
                   <img 
-                    src={selectedProduct.imageUrl} 
-                    className="w-full h-28 object-cover rounded-xl mb-3 border border-white/10" 
+                    src={product.imageUrl} 
+                    className="w-full h-24 object-cover rounded-xl mb-2 border border-white/10" 
                     referrerPolicy="no-referrer"
+                    alt={product.name}
                   />
-                ) : (
-                  <div className="w-full h-28 bg-brand-accent/10 rounded-xl mb-3 flex items-center justify-center border border-brand-accent/20">
-                    <Leaf className="text-brand-accent w-10 h-10 opacity-50" />
-                  </div>
                 )}
-                <h4 className="font-bold text-brand-success text-base mb-1">{selectedProduct.name}</h4>
-                <p className="text-[10px] text-white/50 mb-3 uppercase tracking-widest leading-none">ولاية {selectedProduct.wilaya}</p>
-                <div className="flex items-center justify-between border-t border-white/5 pt-3">
-                  <span className="font-black text-brand-accent text-sm">
-                    {selectedProduct.price ? `${selectedProduct.price} دج` : 'مركز استراتيجي'}
-                  </span>
-                  <button className="bg-white/5 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter border border-white/10">
-                    عرض البيانات
-                  </button>
+                <h4 className="font-bold text-emerald-600 text-sm mb-1">{product.name}</h4>
+                <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-widest">{product.wilaya}</p>
+                <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                  <span className="font-black text-emerald-700 text-sm">{product.price} دج</span>
                 </div>
               </div>
-            </InfoWindow>
-          )}
-        </Map>
-      </APIProvider>
+            </Popup>
+          </Marker>
+        ))}
+
+        {/* Strategic Hubs */}
+        {MOCK_HUBS.map((hub) => (
+          <Marker 
+            key={hub.id} 
+            position={[hub.location.lat, hub.location.lng]}
+          >
+            <Popup>
+              <div className="p-2 max-w-[200px] text-right font-sans" dir="rtl">
+                <div className="w-full h-20 bg-amber-50 rounded-xl mb-2 flex items-center justify-center border border-amber-200">
+                  <Leaf className="text-amber-500 w-8 h-8 opacity-50" />
+                </div>
+                <h4 className="font-bold text-amber-600 text-sm mb-1">{hub.name}</h4>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest">ولاية {hub.wilaya}</p>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+
+      {/* Map Legend Overlay */}
+      <div className="absolute bottom-6 right-6 z-[1000] bg-brand-sidebar/90 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-2xl hidden md:block">
+        <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">دليل الخريطة</h4>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+            <span className="text-[10px] font-bold text-white/80">عرض فلاحي مباشر</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"></div>
+            <span className="text-[10px] font-bold text-white/80">مركز تخزين استراتيجي</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+
