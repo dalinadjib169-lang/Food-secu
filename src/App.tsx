@@ -51,9 +51,11 @@ export default function App() {
     async function testConnection() {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if(error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
+        console.log("Firebase connected successfully");
+      } catch (error: any) {
+        console.error("Firebase Connection Error:", error);
+        if (error?.message?.includes('the client is offline') || error?.code === 'failed-precondition') {
+          console.error("Please check your Firebase configuration. Ensure Firestore is enabled in your Firebase Console.");
         }
       }
     }
@@ -90,6 +92,34 @@ export default function App() {
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  const handleDownloadNewsletter = () => {
+    console.log("Downloading newsletter...");
+    const prices = [
+      { name: 'بطاطا', price: 65 },
+      { name: 'بصل', price: 40 },
+      { name: 'طماطم', price: 80 },
+      { name: 'فلفل', price: 110 }
+    ];
+    
+    try {
+      // Create CSV content with UTF-8 BOM for Excel Arabic support
+      const csvContent = "\uFEFF" + "المنتج,السعر (دج)\n" + prices.map(e => `${e.name},${e.price}`).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `نشرة_أسعار_الغذاء_${new Date().toLocaleDateString('ar-DZ')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      console.log("Download triggered successfully");
+    } catch (err) {
+      console.error("Failed to download newsletter:", err);
+      alert("عذراً، فشل تحميل النشرة. يرجى المحاولة لاحقاً.");
+    }
+  };
+
   const login = async () => {
     console.log("Starting login process...");
     setIsLoggingIn(true);
@@ -105,7 +135,7 @@ export default function App() {
       } else if (err.code === 'auth/popup-blocked') {
         alert("⚠️ المتصفح منع فتح نافذة الدخول. يرجى السماح بالنوافذ المنبثقة (Popups) من إعدادات المتصفح ثم المحاولة مرة أخرى.");
       } else if (err.code === 'auth/unauthorized-domain') {
-        alert("❌ خطأ: هذا النطاق (food-secu.vercel.app) غير مصرح به في إعدادات Firebase. يجب إضافته في قائمة Authorized Domains.");
+        alert("❌ خطأ نطاق غير مصرح به: يرجى الذهاب إلى Firebase Console ثم Authentication ثم Settings ثم Authorized Domains وإضافة food-secu.vercel.app");
       } else if (err.code === 'auth/operation-not-allowed') {
         alert("❌ خطأ: تسجيل الدخول بواسطة Google غير مفعل في Firebase Console.");
       } else {
@@ -269,7 +299,7 @@ export default function App() {
           
           <button 
             onClick={handleAddButtonClick}
-            className="mr-auto bg-brand-accent text-brand-bg px-6 py-3 rounded-2xl font-black hover:bg-brand-accent/90 transition-all shadow-lg shadow-brand-accent/20 flex items-center gap-2 text-sm active:scale-95 border-b-4 border-brand-accent/20"
+            className="mr-auto hidden sm:flex bg-brand-accent text-brand-bg px-6 py-3 rounded-2xl font-black hover:bg-brand-accent/90 transition-all shadow-lg shadow-brand-accent/20 items-center gap-2 text-sm active:scale-95 border-b-4 border-brand-accent/20"
           >
             <PlusCircle size={18} /> إضافة منتج
           </button>
@@ -387,7 +417,12 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-                    <button className="w-full mt-8 py-4 text-brand-success text-xs font-black uppercase tracking-widest border border-brand-success/30 rounded-2xl hover:bg-brand-success/10 transition-all">تحميل النشرة</button>
+                    <button 
+                      onClick={handleDownloadNewsletter}
+                      className="w-full mt-8 py-4 text-brand-success text-xs font-black uppercase tracking-widest border border-brand-success/30 rounded-2xl hover:bg-brand-success/10 transition-all active:scale-95"
+                    >
+                      تحميل النشرة
+                    </button>
                   </div>
                 </div>
               </motion.div>
