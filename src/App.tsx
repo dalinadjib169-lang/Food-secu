@@ -108,11 +108,19 @@ export default function App() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `نشرة_أسعار_الغذاء_${new Date().toLocaleDateString('ar-DZ')}.csv`;
+      link.setAttribute('download', `نشرة_أسعار_الغذاء_${new Date().toLocaleDateString('ar-DZ')}.csv`);
+      link.style.display = 'none';
       document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      
+      // Delay for mobile browsers
+      setTimeout(() => {
+        link.click();
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }, 100);
+      }, 0);
+      
       console.log("Download triggered successfully");
     } catch (err) {
       console.error("Failed to download newsletter:", err);
@@ -135,9 +143,9 @@ export default function App() {
       } else if (err.code === 'auth/popup-blocked') {
         alert("⚠️ المتصفح منع فتح نافذة الدخول. يرجى السماح بالنوافذ المنبثقة (Popups) من إعدادات المتصفح ثم المحاولة مرة أخرى.");
       } else if (err.code === 'auth/unauthorized-domain') {
-        alert("❌ خطأ نطاق غير مصرح به: يرجى الذهاب إلى Firebase Console ثم Authentication ثم Settings ثم Authorized Domains وإضافة food-secu.vercel.app");
+        alert(`❌ خطأ في النطاق: النطاق الحالي (${window.location.hostname}) غير مصرح به في إعدادات Firebase.\n\nيجب عليك إضافة هذا النطاق و نطاق Vercel في: \nFirebase Console > Authentication > Settings > Authorized Domains`);
       } else if (err.code === 'auth/operation-not-allowed') {
-        alert("❌ خطأ: تسجيل الدخول بواسطة Google غير مفعل في Firebase Console.");
+        alert("❌ خطأ: تسجيل الدخول بواسطة Google غير مفعل في Firebase Console (Authentication > Sign-in method).");
       } else {
         alert("حدث خطأ أثناء الدخول: " + (err.message || "خطأ غير معروف"));
       }
@@ -653,13 +661,15 @@ function ProductForm({ onSubmit, onClose, isPublishing }: { onSubmit: (data: any
         <button 
           onClick={() => onSubmit(formData)}
           disabled={isPublishing || !formData.imageUrl || !formData.name || !formData.price}
-          className="flex-[2] bg-brand-success text-brand-bg h-14 rounded-2xl font-black shadow-xl shadow-brand-success/10 disabled:grayscale disabled:opacity-30 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+          className="flex-[2] bg-brand-success text-brand-bg h-14 rounded-2xl font-black shadow-xl shadow-brand-success/10 disabled:grayscale disabled:opacity-50 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
         >
           {isPublishing ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               جاري النشر...
             </>
+          ) : !formData.imageUrl && formData.name && formData.price ? (
+            "يرجى رفع الصورة للمواصلة"
           ) : "نشر العرض الآن"}
         </button>
       </div>

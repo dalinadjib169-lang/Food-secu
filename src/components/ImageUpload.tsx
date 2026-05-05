@@ -3,6 +3,8 @@ import { Upload, X, CheckCircle2, Loader2, Image as ImageIcon } from "lucide-rea
 import { uploadToCloudinary } from "../lib/cloudinary";
 import { cn } from "../lib/utils";
 
+import imageCompression from "browser-image-compression";
+
 interface ImageUploadProps {
   onUploadComplete: (url: string) => void;
   className?: string;
@@ -10,6 +12,7 @@ interface ImageUploadProps {
 
 export function ImageUpload({ onUploadComplete, className }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,23 +20,34 @@ export function ImageUpload({ onUploadComplete, className }: ImageUploadProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Local preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    // Local preview (immediate)
+    const previewUrl = URL.createObjectURL(file);
+    setPreview(previewUrl);
 
-    setIsUploading(true);
     setError(null);
 
     try {
-      const url = await uploadToCloudinary(file);
+      // Step 1: Compress
+      setIsCompressing(true);
+      const options = {
+        maxSizeMB: 0.8, // Max size 800KB for faster upload
+        maxWidthOrHeight: 1280,
+        useWebWorker: true,
+      };
+      
+      const compressedFile = await imageCompression(file, options);
+      setIsCompressing(false);
+
+      // Step 2: Upload
+      setIsUploading(true);
+      const url = await uploadToCloudinary(compressedFile);
       onUploadComplete(url);
     } catch (err: any) {
-      setError(err.message || "Failed to upload image");
+      console.error("Upload process error:", err);
+      setError(err.message || "فشل معالجة أو رفع الصورة");
       setPreview(null);
     } finally {
+      setIsCompressing(false);
       setIsUploading(false);
     }
   };
@@ -52,10 +66,12 @@ export function ImageUpload({ onUploadComplete, className }: ImageUploadProps) {
           preview ? "border-brand-success bg-brand-success/5" : "border-white/10 hover:border-brand-success/40 bg-white/[0.02]"
         )}
       >
-        {isUploading && (
+        {(isUploading || isCompressing) && (
           <div className="absolute inset-0 z-20 bg-brand-bg/90 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
             <Loader2 className="w-10 h-10 text-brand-success animate-spin" />
-            <p className="text-xs font-black text-brand-success uppercase tracking-widest">UPLOADING ASSET...</p>
+            <p className="text-xs font-black text-brand-success uppercase tracking-widest">
+              {isCompressing ? "جاري معالجة الصورة..." : "جاري الرفع الفني..."}
+            </p>
           </div>
         )}
 
