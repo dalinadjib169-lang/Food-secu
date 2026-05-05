@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "An agricultural product listed by a farmer.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the product" },
+        "price": { "type": "number", "description": "Price in DZD" },
+        "unit": { "type": "string", "description": "Weight unit (e.g., kg, quintal)" },
+        "category": { "type": "string", "description": "Category (Vegetables, Fruits, etc)" },
+        "wilaya": { "type": "string", "description": "Algerian province" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "farmerId": { "type": "string", "description": "Firebase Auth UID of the farmer" },
+        "farmerName": { "type": "string", "description": "Display name of the farmer" },
+        "imageUrl": { "type": "string", "description": "Cloudinary URL" },
+        "createdAt": { "type": "number", "description": "Unix timestamp" },
+        "available": { "type": "boolean", "description": "Availability status" }
+      },
+      "required": ["name", "price", "farmerId", "imageUrl", "createdAt"]
+    },
+    "PriceReport": {
+      "title": "Price Report",
+      "description": "A user report about price hikes or shortages.",
+      "type": "object",
+      "properties": {
+        "productName": { "type": "string" },
+        "price": { "type": "number" },
+        "wilaya": { "type": "string" },
+        "type": { "type": "string", "enum": ["shortage", "price_hike", "normal"] },
+        "userId": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["productName", "price", "wilaya", "type", "timestamp"]
+    }
+  },
+  "firestore": {
+    "products": {
+      "schema": "Product",
+      "description": "Marketplace items"
+    },
+    "reports": {
+      "schema": "PriceReport",
+      "description": "User price alerts"
+    }
+  }
+}

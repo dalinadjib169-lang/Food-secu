@@ -1,0 +1,6 @@
+{
+  "name": "FoodSecure DZ",
+  "description": "منصة رقمية لربط الفلاحين بالمستهلكين، تتبع الأسعار، وتوفير خريطة تفاعلية لتوفر المواد الغذائية في الجزائر.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["Real-time Marketplace", "Price Tracking", "Interactive Supply Map"]
+}

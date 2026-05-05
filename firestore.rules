@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidProduct(data) {
+      // Essentials for display and security
+      return data.name is string && data.name.size() > 0 
+        && data.price is number
+        && data.farmerId is string
+        && data.imageUrl is string
+        && (data.location == null || (data.location is map && data.location.lat is number && data.location.lng is number));
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['productName', 'price', 'wilaya', 'type', 'timestamp'])
+        && data.productName is string && data.productName.size() <= 100
+        && data.price is number
+        && data.wilaya is string
+        && data.type in ['shortage', 'price_hike', 'normal']
+        && data.timestamp is number;
+    }
+
+    // --- Collection Rules ---
+
+    match /products/{productId} {
+      // Products are public
+      allow read: if true;
+      allow create: if isValidProduct(incoming());
+      allow update: if (isSignedIn() && isOwner(existing().farmerId)) || (existing().farmerId == 'guest');
+      allow delete: if isSignedIn() && isOwner(existing().farmerId);
+    }
+
+    match /reports/{reportId} {
+      allow read: if true;
+      allow create: if isValidReport(incoming());
+    }
+  }
+}
