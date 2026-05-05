@@ -95,19 +95,19 @@ export default function App() {
     setIsLoggingIn(true);
     try {
       console.log("Opening Google identity popup...");
-      await signInWithPopup(auth, googleProvider);
-      console.log("Logged in successfully!");
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log("Logged in successfully:", result.user.email);
     } catch (err: any) {
       console.error("Detailed Login Error Object:", err);
-      console.error("Error Code:", err.code);
-      console.error("Error Message:", err.message);
       
       if (err.code === 'auth/popup-closed-by-user') {
-        // Silent fail, user just closed it
+        console.log("User closed the login popup.");
       } else if (err.code === 'auth/popup-blocked') {
-        alert("⚠️ المتصفح منع فتح نافذة الدخول. يرجى السماح بالنوافذ المنبثقة (Popups) ثم المحاولة مرة أخرى.");
+        alert("⚠️ المتصفح منع فتح نافذة الدخول. يرجى السماح بالنوافذ المنبثقة (Popups) من إعدادات المتصفح ثم المحاولة مرة أخرى.");
       } else if (err.code === 'auth/unauthorized-domain') {
-        alert("❌ هذا النطاق غير مصرح به في Firebase. يرجى إضافة food-secu.vercel.app إلى Authorized domains في إعدادات Firebase.");
+        alert("❌ خطأ: هذا النطاق (food-secu.vercel.app) غير مصرح به في إعدادات Firebase. يجب إضافته في قائمة Authorized Domains.");
+      } else if (err.code === 'auth/operation-not-allowed') {
+        alert("❌ خطأ: تسجيل الدخول بواسطة Google غير مفعل في Firebase Console.");
       } else {
         alert("حدث خطأ أثناء الدخول: " + (err.message || "خطأ غير معروف"));
       }
