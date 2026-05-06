@@ -57,15 +57,27 @@ export default function App() {
   const fetchData = async () => {
     try {
       const [productsRes, reportsRes] = await Promise.all([
-        fetch("/api/products"),
-        fetch("/api/reports")
+        fetch("/api/products").catch(() => null),
+        fetch("/api/reports").catch(() => null)
       ]);
-      const productsData = await productsRes.json();
-      const reportsData = await reportsRes.json();
-      setProducts(productsData.sort((a: any, b: any) => b.createdAt - a.createdAt));
+      
+      let productsData = [];
+      let reportsData = [];
+
+      if (productsRes && productsRes.ok) productsData = await productsRes.json();
+      if (reportsRes && reportsRes.ok) reportsData = await reportsRes.json();
+      
+      // Fallback to localStorage if API is unavailable (e.g. on pure static hosts like Vercel)
+      const localProducts = JSON.parse(localStorage.getItem("local_products") || "[]");
+      const combinedProducts = [...productsData, ...localProducts];
+
+      setProducts(combinedProducts.sort((a: any, b: any) => b.createdAt - a.createdAt));
       setReports(reportsData.sort((a: any, b: any) => b.createdAt - a.createdAt));
     } catch (error) {
       console.error("Failed to fetch data:", error);
+      // Last resort fallback
+      const localProducts = JSON.parse(localStorage.getItem("local_products") || "[]");
+      setProducts(localProducts);
     }
   };
 
@@ -123,24 +135,35 @@ export default function App() {
 
     setIsPublishing(true);
     try {
+      const newProduct = {
+        ...formData,
+        price: Number(formData.price),
+        farmerId: localUser?.id || "guest_" + Math.random().toString(36).substr(2, 9),
+        farmerName: localUser?.name || "فلاح مساهم",
+        available: true,
+        location: { lat: 36.7538, lng: 3.0588 },
+        images: formData.images || [formData.imageUrl],
+        comments: [],
+        createdAt: Date.now()
+      };
+
       const response = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          price: Number(formData.price),
-          farmerId: localUser?.id || "guest_" + Math.random().toString(36).substr(2, 9),
-          farmerName: localUser?.name || "فلاح مساهم",
-          available: true,
-          location: { lat: 36.7538, lng: 3.0588 },
-          images: formData.images || [formData.imageUrl],
-          comments: []
-        }),
-      });
-      if (response.ok) {
+        body: JSON.stringify(newProduct),
+      }).catch(() => null);
+
+      if (response && response.ok) {
         setIsModalOpen(false);
         fetchData();
         alert("✅ تم نشر عرضك بنجاح!");
+      } else {
+        // Fallback for Vercel/Static hosting
+        const localProducts = JSON.parse(localStorage.getItem("local_products") || "[]");
+        localStorage.setItem("local_products", JSON.stringify([newProduct, ...localProducts]));
+        setIsModalOpen(false);
+        fetchData();
+        alert("✅ تم الحفظ بنجاح (وضع محلي)! ملاحظة: في Vercel المنشورات تظهر لك فقط.");
       }
     } catch (err) {
       console.error(err);
