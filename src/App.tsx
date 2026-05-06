@@ -10,90 +10,57 @@ import {
   Leaf, 
   TrendingUp, 
   Bell, 
-  User,
+  User as UserIcon,
   ShoppingBag,
   Filter,
   ArrowLeftRight,
   ChevronRight,
   MoreVertical,
-  Loader2
+  Loader2,
+  MessageCircle,
+  Send,
+  X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { 
-  collection, 
-  onSnapshot, 
-  addDoc, 
-  query, 
-  orderBy, 
-  Timestamp,
-  doc,
-  getDocFromServer 
-} from "firebase/firestore";
-import { db, auth, googleProvider } from "./lib/firebase";
-import { signInWithPopup, onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { ImageUpload } from "./components/ImageUpload";
 import { SupplyMap } from "./components/SupplyMap";
 import { PriceTrackingChart } from "./components/PriceTrackingChart";
 import { Product, PriceReport, AppView } from "./lib/types";
 import { cn } from "./lib/utils";
-import { handleFirestoreError, OperationType } from "./lib/firestoreErrorHandler";
 
 export default function App() {
   const [view, setView] = useState<AppView>("marketplace");
   const [products, setProducts] = useState<Product[]>([]);
   const [reports, setReports] = useState<PriceReport[]>([]);
-  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Connection Test
-  useEffect(() => {
-    async function testConnection() {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-        console.log("Firebase connected successfully");
-      } catch (error: any) {
-        console.error("Firebase Connection Error:", error);
-        if (error?.message?.includes('the client is offline') || error?.code === 'failed-precondition') {
-          console.error("Please check your Firebase configuration. Ensure Firestore is enabled in your Firebase Console.");
-        }
-      }
+  // Fetch Data from Local API
+  const fetchData = async () => {
+    try {
+      const [productsRes, reportsRes] = await Promise.all([
+        fetch("/api/products"),
+        fetch("/api/reports")
+      ]);
+      const productsData = await productsRes.json();
+      const reportsData = await reportsRes.json();
+      setProducts(productsData.sort((a: any, b: any) => b.createdAt - a.createdAt));
+      setReports(reportsData.sort((a: any, b: any) => b.createdAt - a.createdAt));
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
     }
-    testConnection();
-  }, []);
+  };
 
-  // Firestore Listeners
   useEffect(() => {
-    const productsPath = "products";
-    const q = query(collection(db, productsPath), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-      setProducts(data);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, productsPath);
-    });
-
-    const reportsPath = "reports";
-    const reportQ = query(collection(db, reportsPath), orderBy("timestamp", "desc"));
-    const unsubscribeReports = onSnapshot(reportQ, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PriceReport));
-      setReports(data);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, reportsPath);
-    });
-
-    onAuthStateChanged(auth, (u) => setUser(u));
-
-    return () => {
-      unsubscribe();
-      unsubscribeReports();
-    };
+    fetchData();
+    const interval = setInterval(fetchData, 5000); // Poll every 5s for updates
+    return () => clearInterval(interval);
   }, []);
 
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const handleDownloadNewsletter = () => {
-    console.log("Downloading newsletter...");
+    // ... same as before
     const prices = [
       { name: 'بطاطا', price: 65 },
       { name: 'بصل', price: 40 },
@@ -128,71 +95,45 @@ export default function App() {
     }
   };
 
-  const login = async () => {
-    console.log("Starting login process...");
-    setIsLoggingIn(true);
-    try {
-      console.log("Opening Google identity popup...");
-      const result = await signInWithPopup(auth, googleProvider);
-      console.log("Logged in successfully:", result.user.email);
-    } catch (err: any) {
-      console.error("Detailed Login Error Object:", err);
-      
-      if (err.code === 'auth/popup-closed-by-user') {
-        console.log("User closed the login popup.");
-      } else if (err.code === 'auth/popup-blocked') {
-        alert("⚠️ المتصفح منع فتح نافذة الدخول. يرجى السماح بالنوافذ المنبثقة (Popups) من إعدادات المتصفح ثم المحاولة مرة أخرى.");
-      } else if (err.code === 'auth/unauthorized-domain') {
-        alert(`❌ خطأ في النطاق: النطاق الحالي (${window.location.hostname}) غير مصرح به في إعدادات Firebase.\n\nيجب عليك إضافة هذا النطاق و نطاق Vercel في: \nFirebase Console > Authentication > Settings > Authorized Domains`);
-      } else if (err.code === 'auth/operation-not-allowed') {
-        alert("❌ خطأ: تسجيل الدخول بواسطة Google غير مفعل في Firebase Console (Authentication > Sign-in method).");
-      } else {
-        alert("حدث خطأ أثناء الدخول: " + (err.message || "خطأ غير معروف"));
-      }
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
   const [isPublishing, setIsPublishing] = useState(false);
 
   const addProduct = async (formData: any) => {
-    if (!formData.name || !formData.price || !formData.imageUrl) {
+    if (!formData.name || !formData.price || (!formData.imageUrl && (!formData.images || formData.images.length === 0))) {
       alert("يرجى ملء الاسم، السعر، ورفع الصورة");
       return;
     }
 
     setIsPublishing(true);
-    const path = "products";
     try {
-      await addDoc(collection(db, path), {
-        ...formData,
-        price: Number(formData.price),
-        farmerId: user?.uid || "guest",
-        farmerName: user?.displayName || (user ? "فلاح مسجل" : "فلاح ضيف"),
-        createdAt: Date.now(),
-        available: true,
-        location: { lat: 36.7538, lng: 3.0588 }, // Default Algiers for map visibility
+      const response = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          price: Number(formData.price),
+          farmerId: "guest_" + Math.random().toString(36).substr(2, 9),
+          farmerName: "فلاح مساهم",
+          available: true,
+          location: { lat: 36.7538, lng: 3.0588 },
+          images: formData.images || [formData.imageUrl],
+          comments: []
+        }),
       });
-      setIsModalOpen(false);
-      alert("✅ تم نشر عرضك بنجاح في السوق الرقمي!");
+      if (response.ok) {
+        setIsModalOpen(false);
+        fetchData();
+        alert("✅ تم نشر عرضك بنجاح!");
+      }
     } catch (err) {
       console.error(err);
-      alert("❌ عذراً، فشل النشر. يرجى المحاولة مرة أخرى.");
-      handleFirestoreError(err, OperationType.CREATE, path);
+      alert("❌ عذراً، فشل النشر.");
     } finally {
       setIsPublishing(false);
     }
   };
 
   const handleAddButtonClick = () => {
-    if (!user) {
-      if (confirm("يجب تسجيل الدخول كفلاح لإضافة منتجات. هل تريد تسجيل الدخول الآن؟")) {
-        login();
-      }
-    } else {
-      setIsModalOpen(true);
-    }
+    setIsModalOpen(true);
   };
 
   const filteredProducts = products.filter(p => 
@@ -254,30 +195,15 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            {user ? (
-              <div className="flex items-center gap-3 bg-white/5 p-1 pr-4 rounded-full border border-white/10 shadow-sm">
-                <span className="text-xs font-bold text-white/80 hidden sm:block">{user.displayName}</span>
-                <img src={user.photoURL || ""} className="w-10 h-10 rounded-full border-2 border-brand-accent/50" referrerPolicy="no-referrer" />
-              </div>
-            ) : (
-              <button 
-                id="farmer-login-btn"
-                onClick={login}
-                disabled={isLoggingIn}
-                className="bg-brand-accent text-brand-bg px-6 h-12 rounded-2xl font-black hover:bg-brand-accent/90 transition-all flex items-center gap-2 shadow-lg shadow-brand-accent/30 active:scale-95 disabled:opacity-50 disabled:cursor-wait"
-              >
-                {isLoggingIn ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    جاري الدخول...
-                  </>
-                ) : (
-                  <>
-                    <User size={20} /> دخول الفلاحين
-                  </>
-                )}
-              </button>
-            )}
+            <div className="flex items-center gap-3 bg-brand-success/10 p-1 pr-4 rounded-full border border-brand-success/20 shadow-sm">
+                <div className="flex flex-col items-end">
+                  <span className="text-xs font-bold text-brand-success leading-none">تصفح مباشر</span>
+                  <span className="text-[8px] text-brand-success font-black uppercase tracking-tighter mt-1">OPEN MARKET</span>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-brand-success/20 border-2 border-brand-success/50 flex items-center justify-center">
+                  <UserIcon className="text-brand-success" size={20} />
+                </div>
+            </div>
           </div>
 
         </header>
@@ -325,7 +251,7 @@ export default function App() {
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
               >
                 {filteredProducts.length > 0 ? (filteredProducts as Product[]).map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard key={product.id} product={product} onClick={() => setSelectedProduct(product)} />
                 )) : (
                   <div className="col-span-full py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
                     <ShoppingBag className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -516,6 +442,26 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Product Detail Modal */}
+      <AnimatePresence>
+        {selectedProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedProduct(null)}
+              className="absolute inset-0 bg-brand-bg/90 backdrop-blur-md"
+            />
+            <ProductDetailModal 
+              product={products.find(p => p.id === selectedProduct.id) || selectedProduct} 
+              onClose={() => setSelectedProduct(null)}
+              onUpdate={fetchData}
+            />
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Mobile Nav Overlay */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-brand-sidebar/90 backdrop-blur-xl text-white h-16 rounded-full flex items-center justify-around px-6 shadow-2xl border border-white/10 sm:hidden z-40">
         <button onClick={() => setView('marketplace')} className={cn("p-2 transition-all", view === 'marketplace' && "text-brand-accent scale-125")}><LayoutGrid size={22} /></button>
@@ -533,11 +479,15 @@ export default function App() {
   );
 }
 
-const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
+const ProductCard: React.FC<{ product: Product, onClick?: () => void }> = ({ product, onClick }) => {
   return (
     <motion.div 
       whileHover={{ y: -5, scale: 1.02 }}
-      className="bg-brand-card rounded-[28px] overflow-hidden shadow-2xl shadow-black/50 transition-all border border-white/5 flex flex-col group min-h-[420px]"
+      onClick={onClick}
+      className={cn(
+        "bg-brand-card rounded-[28px] overflow-hidden shadow-2xl shadow-black/50 transition-all border border-white/5 flex flex-col group min-h-[420px]",
+        onClick && "cursor-pointer"
+      )}
     >
       <div className="relative h-56 overflow-hidden bg-brand-sidebar shrink-0">
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent z-10"></div>
@@ -566,7 +516,7 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
         
         <div className="flex items-center gap-3 mt-auto pt-6 border-t border-white/5">
           <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-brand-accent shrink-0 border border-white/5 group-hover:border-brand-accent/30 transition-colors">
-            <User size={18} />
+            <UserIcon size={18} />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-black text-white/80 truncate leading-none">{product.farmerName}</p>
@@ -588,6 +538,7 @@ function ProductForm({ onSubmit, onClose, isPublishing }: { onSubmit: (data: any
     wilaya: "الجزائر",
     category: "خضروات",
     imageUrl: "",
+    images: [] as string[],
     location: { lat: 36.7, lng: 3.0 }
   });
 
@@ -645,8 +596,9 @@ function ProductForm({ onSubmit, onClose, isPublishing }: { onSubmit: (data: any
       <div>
         <label className="text-[11px] uppercase tracking-wider font-black text-white/30 mb-3 block">رفع صورة المنتج (جودة عالية) <span className="text-rose-500">*</span></label>
         <ImageUpload 
-          onUploadComplete={(url) => setFormData({...formData, imageUrl: url})} 
+          onUploadComplete={(urls) => setFormData({...formData, images: urls, imageUrl: urls[0]})} 
           className="bg-white/[0.02]"
+          multiple={true}
         />
       </div>
 
@@ -660,7 +612,7 @@ function ProductForm({ onSubmit, onClose, isPublishing }: { onSubmit: (data: any
         </button>
         <button 
           onClick={() => onSubmit(formData)}
-          disabled={isPublishing || !formData.imageUrl || !formData.name || !formData.price}
+          disabled={isPublishing || (!formData.imageUrl && (!formData.images || formData.images.length === 0)) || !formData.name || !formData.price}
           className="flex-[2] bg-brand-success text-brand-bg h-14 rounded-2xl font-black shadow-xl shadow-brand-success/10 disabled:grayscale disabled:opacity-50 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
         >
           {isPublishing ? (
@@ -676,3 +628,160 @@ function ProductForm({ onSubmit, onClose, isPublishing }: { onSubmit: (data: any
     </div>
   );
 }
+
+const ProductDetailModal: React.FC<{ 
+  product: Product, 
+  onClose: () => void,
+  onUpdate: () => void
+}> = ({ product, onClose, onUpdate }) => {
+  const [activeImage, setActiveImage] = useState(product.images?.[0] || product.imageUrl);
+  const [comment, setComment] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const images = product.images || [product.imageUrl];
+
+  const handleSendComment = async (text: string) => {
+    if (!text.trim() || isSending) return;
+    setIsSending(true);
+    try {
+      const response = await fetch(`/api/products/${product.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "guest_" + Math.random().toString(36).substr(2, 5),
+          userName: "مستخدم",
+          text: text
+        }),
+      });
+      if (response.ok) {
+        setComment("");
+        onUpdate();
+      }
+    } catch (err) {
+      console.error("Error sending comment:", err);
+      alert("فشل إرسال التعليق");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const quickMessages = [
+    "هل هذا المنتج متوفر؟",
+    "كم السعر النهائي؟",
+    "أين يمكنني الاستلام؟",
+    "هل توفرون خدمة التوصيل؟"
+  ];
+
+  return (
+    <motion.div
+      initial={{ scale: 0.9, opacity: 0, y: 20 }}
+      animate={{ scale: 1, opacity: 1, y: 0 }}
+      exit={{ scale: 0.9, opacity: 0, y: 20 }}
+      className="relative bg-brand-sidebar w-full max-w-4xl max-h-[90vh] rounded-[40px] shadow-2xl overflow-hidden border border-white/5 flex flex-col md:flex-row"
+    >
+      <button 
+        onClick={onClose}
+        className="absolute top-6 left-6 z-30 p-2 bg-black/50 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/70 transition-all font-bold"
+      >
+        <ChevronRight size={24} className="rotate-180" />
+      </button>
+
+      {/* Gallery Section */}
+      <div className="md:w-1/2 h-[300px] md:h-auto bg-black relative flex flex-col">
+        <img 
+          src={activeImage} 
+          className="w-full h-full object-cover" 
+          alt={product.name}
+          referrerPolicy="no-referrer"
+        />
+        
+        {images.length > 1 && (
+          <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 px-4 overflow-x-auto pb-2 scrollbar-none z-20">
+            {images.map((img, idx) => (
+              <button 
+                key={idx}
+                onClick={() => setActiveImage(img)}
+                className={cn(
+                  "w-12 h-12 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0",
+                  activeImage === img ? "border-brand-accent scale-110" : "border-transparent opacity-50 hover:opacity-100"
+                )}
+              >
+                <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Details Section */}
+      <div className="md:w-1/2 p-8 md:p-10 flex flex-col h-full overflow-y-auto bg-brand-sidebar text-right">
+        <div className="flex items-center gap-3 mb-4 justify-start flex-row-reverse">
+          <span className="px-3 py-1 bg-brand-success/10 text-brand-success text-[10px] font-black rounded-full border border-brand-success/20 uppercase tracking-widest">{product.category}</span>
+          <span className="flex items-center gap-1 text-[10px] text-white/30 font-black uppercase tracking-widest"><MapPin size={12} /> {product.wilaya}</span>
+        </div>
+        
+        <h2 className="text-3xl font-black text-white mb-2 leading-tight italic">{product.name}</h2>
+        <div className="flex items-baseline gap-2 mb-8 justify-start flex-row-reverse">
+          <span className="text-4xl font-black text-brand-accent">{product.price} دج</span>
+          <span className="text-sm font-bold text-white/30 italic">/ كغ (جملة)</span>
+        </div>
+
+        <div className="space-y-8 flex flex-col flex-1">
+          {/* Quick Messages */}
+          <div>
+            <h4 className="text-[11px] font-black text-white/30 uppercase tracking-[0.2em] mb-4">رسالة سريعة للبائع</h4>
+            <div className="flex flex-wrap gap-2 justify-start flex-row-reverse">
+              {quickMessages.map((msg, i) => (
+                <button 
+                  key={i}
+                  onClick={() => handleSendComment(msg)}
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[11px] font-bold text-white/70 hover:bg-brand-success/10 hover:text-brand-success hover:border-brand-success/30 transition-all active:scale-95"
+                >
+                  {msg}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Comments Section */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <h4 className="text-[11px] font-black text-white/30 uppercase tracking-[0.2em] mb-4">التعليقات والمناقشات</h4>
+            <div className="space-y-4 mb-6 overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-[150px]">
+              {(product.comments || []).length > 0 ? (
+                product.comments?.map((c) => (
+                  <div key={c.id} className="bg-white/5 p-4 rounded-2xl border border-white/5 text-right">
+                    <div className="flex justify-between items-center mb-1 flex-row-reverse">
+                      <span className="text-[10px] font-black text-brand-accent">{c.userName}</span>
+                      <span className="text-[8px] text-white/20">{new Date(c.createdAt).toLocaleTimeString('ar-DZ')}</span>
+                    </div>
+                    <p className="text-xs text-white/70 font-medium leading-relaxed">{c.text}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center py-6 text-white/10 text-xs italic font-bold">لا توجد تعليقات بعد، كن أول من يسأل</p>
+              )}
+            </div>
+
+            <div className="relative mt-auto pt-4">
+              <input 
+                type="text" 
+                placeholder="اكتب سؤالك هنا..." 
+                className="w-full bg-white/5 border border-white/10 h-12 pr-5 pl-14 rounded-2xl focus:outline-none focus:border-brand-accent transition-all text-sm font-medium text-right"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendComment(comment)}
+              />
+              <button 
+                onClick={() => handleSendComment(comment)}
+                disabled={isSending || !comment.trim()}
+                className="absolute left-1.5 top-1/2 translate-y-[2px] w-10 h-10 bg-brand-accent text-brand-bg rounded-xl flex items-center justify-center hover:bg-brand-accent/90 transition-all active:scale-90 disabled:opacity-30"
+              >
+                {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};

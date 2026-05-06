@@ -1,3 +1,11 @@
+export interface Comment {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -12,8 +20,10 @@ export interface Product {
   farmerId: string;
   farmerName: string;
   imageUrl: string;
+  images?: string[];
   createdAt: number;
   available: boolean;
+  comments?: Comment[];
 }
 
 export interface PriceReport {
