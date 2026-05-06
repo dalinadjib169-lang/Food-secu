@@ -32,8 +32,26 @@ export default function App() {
   const [view, setView] = useState<AppView>("marketplace");
   const [products, setProducts] = useState<Product[]>([]);
   const [reports, setReports] = useState<PriceReport[]>([]);
+  const [localUser, setLocalUser] = useState<{ name: string; id: string } | null>(() => {
+    const saved = localStorage.getItem("farmer_user");
+    return saved ? JSON.parse(saved) : null;
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const login = () => {
+    const name = prompt("يرجى إدخال اسمك (كفلاح أو تاجر):");
+    if (name && name.trim()) {
+      const newUser = { name, id: "local_" + Date.now() };
+      setLocalUser(newUser);
+      localStorage.setItem("farmer_user", JSON.stringify(newUser));
+    }
+  };
+
+  const logout = () => {
+    setLocalUser(null);
+    localStorage.removeItem("farmer_user");
+  };
 
   // Fetch Data from Local API
   const fetchData = async () => {
@@ -111,8 +129,8 @@ export default function App() {
         body: JSON.stringify({
           ...formData,
           price: Number(formData.price),
-          farmerId: "guest_" + Math.random().toString(36).substr(2, 9),
-          farmerName: "فلاح مساهم",
+          farmerId: localUser?.id || "guest_" + Math.random().toString(36).substr(2, 9),
+          farmerName: localUser?.name || "فلاح مساهم",
           available: true,
           location: { lat: 36.7538, lng: 3.0588 },
           images: formData.images || [formData.imageUrl],
@@ -195,15 +213,30 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 bg-brand-success/10 p-1 pr-4 rounded-full border border-brand-success/20 shadow-sm">
+            {localUser ? (
+              <div className="flex items-center gap-3 bg-brand-success/10 p-1 pr-4 rounded-full border border-brand-success/20 shadow-sm group relative">
                 <div className="flex flex-col items-end">
-                  <span className="text-xs font-bold text-brand-success leading-none">تصفح مباشر</span>
-                  <span className="text-[8px] text-brand-success font-black uppercase tracking-tighter mt-1">OPEN MARKET</span>
+                  <span className="text-xs font-bold text-brand-success leading-none">{localUser.name}</span>
+                  <span className="text-[8px] text-brand-success font-black uppercase tracking-tighter mt-1">FARMER MODE</span>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-brand-success/20 border-2 border-brand-success/50 flex items-center justify-center">
                   <UserIcon className="text-brand-success" size={20} />
                 </div>
-            </div>
+                <button 
+                  onClick={logout}
+                  className="absolute -top-1 -left-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center scale-0 group-hover:scale-100 transition-transform shadow-xl"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={login}
+                className="bg-brand-accent text-brand-bg px-5 h-10 rounded-xl font-black flex items-center gap-2 hover:bg-brand-accent/90 transition-all text-xs"
+              >
+                <UserIcon size={16} /> دخول الفلاحين
+              </button>
+            )}
           </div>
 
         </header>
@@ -457,6 +490,7 @@ export default function App() {
               product={products.find(p => p.id === selectedProduct.id) || selectedProduct} 
               onClose={() => setSelectedProduct(null)}
               onUpdate={fetchData}
+              localUser={localUser}
             />
           </div>
         )}
@@ -632,8 +666,9 @@ function ProductForm({ onSubmit, onClose, isPublishing }: { onSubmit: (data: any
 const ProductDetailModal: React.FC<{ 
   product: Product, 
   onClose: () => void,
-  onUpdate: () => void
-}> = ({ product, onClose, onUpdate }) => {
+  onUpdate: () => void,
+  localUser: { name: string; id: string } | null
+}> = ({ product, onClose, onUpdate, localUser }) => {
   const [activeImage, setActiveImage] = useState(product.images?.[0] || product.imageUrl);
   const [comment, setComment] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -648,8 +683,8 @@ const ProductDetailModal: React.FC<{
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: "guest_" + Math.random().toString(36).substr(2, 5),
-          userName: "مستخدم",
+          userId: localUser?.id || "guest_" + Math.random().toString(36).substr(2, 5),
+          userName: localUser?.name || "مستخدم",
           text: text
         }),
       });
